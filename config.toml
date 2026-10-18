@@ -1,0 +1,196 @@
+# Herdr configuration — rich agent-friendly setup.
+#
+# - Keybindings are intentionally untouched: no binding was added, removed,
+#   or changed anywhere in this file (see the [keys] section at the bottom).
+# - Validate after edits:   herdr config check
+# - Apply to the server:    herdr server reload-config
+# - Full option reference:  https://herdr.dev/docs/config-reference/
+# - Complete default file:  herdr --default-config
+
+onboarding = false
+
+# ------------------------------------------------------------------ Theme ---
+[theme]
+# Base theme.
+name = "vesper"
+
+# Auto-switching off: Herdr always uses the dark catppuccin theme above.
+# To follow the host terminal's light/dark appearance, set auto_switch = true.
+auto_switch = false
+# dark_name = "catppuccin"
+# light_name = "catppuccin-latte"
+
+# Fine-grained token overrides on top of the base theme:
+# [theme.custom]
+# accent = "#89b4fa"
+# sidebar_bg = "#181825"
+# [theme.custom.light]
+# panel_bg = "#eff1f5"
+
+# --------------------------------------------------------------- Terminal ---
+[terminal]
+# Where new panes/tabs/workspaces start: "follow" inherits the source pane;
+# also accepts "home", "current", or a fixed path such as "~/Projects".
+new_cwd = "follow"
+
+# Shell startup mode: "auto" (login shells on macOS), "login", or "non_login".
+# shell_mode = "auto"
+
+# Shell used for new interactive panes (default: $SHELL, then /bin/sh).
+# default_shell = ""
+
+# Render images for apps that emit Kitty graphics protocol (default: true).
+# kitty_graphics = true
+
+# ----------------------------------------------------------------- Update ---
+[update]
+# Update channel for background checks and `herdr update`.
+channel = "stable"
+
+# Check for new Herdr versions and agent-detection manifest updates.
+version_check = true
+manifest_check = true
+
+# -------------------------------------------------------------- Worktrees ---
+# Root directory for Git worktree checkouts created from the sidebar:
+# [worktrees]
+# directory = "~/.herdr/worktrees"
+
+# --------------------------------------------------------------------- UI ---
+[ui]
+# Distinguish blocked/working/done/idle/unknown by shape as well as color.
+status_indicators = "symbols"
+
+# tmux-style status area at the right edge of the tab row.
+tab_bar_right = [
+  { type = "zoom" },
+  # Live CPU/RAM from status.sh; runs server-side, refreshed every 5s.
+  { type = "command", command = "~/.config/herdr/status.sh", interval_seconds = 5, timeout_seconds = 2 },
+  { type = "hostname" },
+  { type = "datetime", format = "%H:%M" },
+  # { type = "text", text = "prod" },
+]
+tab_bar_right_separator = " · "
+
+# Title written to the outer terminal (window managers / terminal tabs).
+window_title = "{hostname}: {workspace} · {tab}"
+
+# Label split pane borders with the detected agent when no name is set.
+show_agent_labels_on_pane_borders = true
+
+# Wider expanded sidebar with room for the richer agent/space rows below.
+sidebar_width = 34
+sidebar_min_width = 26
+sidebar_max_width = 44
+
+# Other presentation knobs:
+# tab_bar_position = "top"                 # "top" or "bottom"
+# hide_tab_bar_when_single_tab = false
+# sidebar_start_collapsed = false
+# sidebar_collapsed_mode = "compact"       # "compact" or "hidden"
+# mouse_capture = true                     # false lets the terminal handle clicks
+# copy_on_select = true                    # auto-copy mouse selections
+# mouse_scroll_lines = 3                   # scrollback lines per wheel notch
+# pane_borders = "auto"                    # "auto" | "always" | "off"
+# pane_outer_borders = true
+# pane_scrollbars = true
+# pane_gaps = true
+# confirm_close = true
+# prompt_new_tab_name = true
+# prompt_new_workspace_name = false
+# agent_panel_sort = "spaces"              # "spaces" or "priority" queue
+
+# Background notification popups: "herdr" (in-app toast), "terminal"
+# (outer-terminal notification; also works over SSH), "system" (macOS
+# Notification Center — install terminal-notifier for click-to-activate),
+# or "off".
+[ui.toast]
+delivery = "herdr"
+delay_seconds = 1
+
+[ui.toast.herdr]
+position = "bottom-right"
+
+# Confirmation toast when text is copied.
+[ui.toast.clipboard]
+enabled = true
+position = "bottom-center"
+
+# Sound alerts when background agents finish or need input.
+[ui.sound]
+enabled = true
+# Custom mp3 sounds resolve relative to this file:
+# path = "sounds/notification.mp3"
+# done_path = "sounds/done.mp3"
+# request_path = "sounds/request.mp3"
+# Per-agent overrides accept "default" | "on" | "off" (droid is off by default):
+# [ui.sound.agents]
+# claude = "on"
+
+# Richer expanded sidebar rows (desktop sidebar only; collapsed and mobile
+# views keep their compact layouts). Agent tokens include state_icon,
+# state_text, machine, workspace, tab, pane, agent, terminal_title,
+# terminal_title_stripped, and custom $name values.
+#
+# Agent status icons and state text come from session-usage.py as the $icon
+# and $state tokens so both can be custom: ✳ working · ⋯ background ·
+# ! blocked · ✓ done · ○ idle · ? unknown. "background" shows while OpenCode
+# still runs subagents or background shells after a turn has ended, when
+# Herdr's own state has already fallen back to "idle". Colors follow Herdr's
+# semantic palette (working yellow, blocked red, done teal, idle green,
+# unknown grey).
+[ui.sidebar.agents]
+row_gap = 1
+rows = [
+  [{ token = "$icon", rules = [{ equals = "✳", fg = "#f9e2af" }, { equals = "⋯", fg = "#f9e2af" }, { equals = "!", fg = "#f38ba8", bold = true }, { equals = "✓", fg = "#94e2d5" }, { equals = "○", fg = "#a6e3a1" }, { equals = "?", fg = "#6c7086" }] }, "$model", "workspace"],
+  ["agent", { token = "$state", rules = [{ equals = "working", fg = "#f9e2af" }, { equals = "background", fg = "#f9e2af" }, { equals = "blocked", fg = "#f38ba8", bold = true }, { equals = "done", fg = "#94e2d5" }, { equals = "idle", fg = "#a6e3a1" }, { equals = "unknown", fg = "#6c7086", dim = true }] }],
+  ["$ctx", "$cost", "$ch"],
+]
+
+# Space rows: rolled-up state, workspace, and Git branch/ahead-behind.
+[ui.sidebar.spaces]
+row_gap = 1
+rows = [
+  ["state_icon", "workspace", "state_text"],
+  ["branch", "git_status"],
+]
+
+# ---------------------------------------------------------------- Session ---
+[session]
+# Resume supported agents into their native conversations after a restart.
+resume_agents_on_restore = true
+startup_per_agent_delay_ms = 100
+
+# ----------------------------------------------------------------- Remote ---
+[remote]
+# Let Herdr add SSH keepalives and connection reuse for `herdr --remote`.
+manage_ssh_config = true
+
+# ----------------------------------------------------------- Experimental ---
+[experimental]
+# Save recent pane screen contents across full server restarts. Off by
+# default: pane output is stored on disk (session-history.json) and may
+# contain secrets, so enable knowingly.
+# pane_history = true
+
+# Allow launching herdr from inside a herdr-managed pane (nested).
+# allow_nested = false
+
+# macOS: switch to an ASCII-capable input source while prefix mode is active.
+# switch_ascii_input_source_in_prefix = true
+
+# macOS: reveal a cursor anchor so IME candidate windows follow agent TUIs.
+# reveal_hidden_cursor_for_cjk_ime = true
+# cjk_ime_agents = ["claude", "codex", "opencode"]
+
+# --------------------------------------------------------------- Advanced ---
+[advanced]
+# Per-pane scrollback cap in bytes (default 10000000 = 10 MB).
+scrollback_limit_bytes = 20000000
+
+# ------------------------------------------------------------------- Keys ---
+# Left exactly as configured — no keybindings added or changed.
+# Running `herdr --default-config` documents every available action, and
+# `prefix+?` in the app lists the live bindings.
+[keys]
+prefix = "ctrl + x"
