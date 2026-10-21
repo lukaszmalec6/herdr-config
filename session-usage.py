@@ -125,6 +125,8 @@ def humanize(n):
 
 def opencode_usage(db, sid):
     """Return (model, ctx, cost, ch) display strings or None."""
+    if db is None:
+        return None
     row = db.execute(
         "SELECT model, cost FROM session_v2 WHERE id = ?", (sid,)
     ).fetchone()
@@ -405,7 +407,7 @@ def agent_usage(session, db):
     agent = session.get("agent")
     if agent == "opencode":
         sid = session.get("value")
-        return opencode_usage(db, sid) if sid else None
+        return opencode_usage(db, sid) if sid and db is not None else None
     if agent == "pi":
         return pi_usage(pi_session_file(session))
     if agent == "claude":
@@ -469,18 +471,19 @@ def report_once(db, log):
                 # sessions that are still running, so those flags cannot
                 # be used to filter dead sessions out.
                 family = {sid}
-                family.update(
-                    row[0]
-                    for row in db.execute(
-                        "WITH RECURSIVE tree(id) AS ("
-                        " SELECT id FROM session_v2 WHERE parent_id = ?"
-                        " UNION ALL"
-                        " SELECT s.id FROM session_v2 s JOIN tree t"
-                        " ON s.parent_id = t.id"
-                        ") SELECT id FROM tree",
-                        (sid,),
+                if db is not None:
+                    family.update(
+                        row[0]
+                        for row in db.execute(
+                            "WITH RECURSIVE tree(id) AS ("
+                            " SELECT id FROM session_v2 WHERE parent_id = ?"
+                            " UNION ALL"
+                            " SELECT s.id FROM session_v2 s JOIN tree t"
+                            " ON s.parent_id = t.id"
+                            ") SELECT id FROM tree",
+                            (sid,),
+                        )
                     )
-                )
                 if not family.isdisjoint(active_now()):
                     status = "background"  # a subagent is still running
                 elif not family.isdisjoint(
@@ -516,17 +519,34 @@ def report_once(db, log):
     return reported
 
 
-def main():
-    once = "--once" in sys.argv
+def connect_db():
+    """Open the OpenCode DB read-only, or return None if it is unavailable.
 
-    def connect():
+    OpenCode is optional: users with only pi, Claude Code, or Copilot must
+    still get state icons and their own session statistics.
+    """
+    if not DB.is_file():
+        return None
+    try:
         return sqlite3.connect(
             "file:{}?mode=ro".format(DB), uri=True, timeout=3
         )
+    except sqlite3.Error as exc:
+        print(
+            "session-usage: cannot open %s: %s" % (DB, exc),
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
 
-    db = connect()
+
+def main():
+    once = "--once" in sys.argv
+    db = connect_db()
     while True:
         try:
+            if db is None and DB.is_file():
+                db = connect_db()
             report_once(db, once)
         except sqlite3.Error as exc:
             print("session-usage: db error: %s" % exc, file=sys.stderr, flush=True)
@@ -534,8 +554,8 @@ def main():
                 db.close()
             except Exception:
                 pass
+            db = None
             time.sleep(1)
-            db = connect()
         except Exception as exc:
             print("session-usage: %s" % exc, file=sys.stderr, flush=True)
         if once:
